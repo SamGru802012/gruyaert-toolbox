@@ -58,6 +58,7 @@ def draw_3d_box(box_dim, product_dim, fits, box_id):
     )
     return fig
 
+
 def draw_3d_pallet(box_dim, pallet_dim, boxes_per_layer, layers):
     fig = go.Figure()
     count = 0
@@ -68,9 +69,9 @@ def draw_3d_pallet(box_dim, pallet_dim, boxes_per_layer, layers):
                 y_shift = j * box_dim[1]
                 z_shift = layer * box_dim[2]
                 fig.add_trace(go.Mesh3d(
-                    x=[0, box_dim[0], box_dim[0], 0, 0, box_dim[0], box_dim[0], 0] + x_shift,
-                    y=[0, 0, box_dim[1], box_dim[1], 0, 0, box_dim[1], box_dim[1]] + y_shift,
-                    z=[0, 0, 0, 0, box_dim[2], box_dim[2], box_dim[2], box_dim[2]] + z_shift,
+                    x=[coord + x_shift for coord in [0, box_dim[0], box_dim[0], 0, 0, box_dim[0], box_dim[0], 0]],
+                    y=[coord + y_shift for coord in [0, 0, box_dim[1], box_dim[1], 0, 0, box_dim[1], box_dim[1]]],
+                    z=[coord + z_shift for coord in [0, 0, 0, 0, box_dim[2], box_dim[2], box_dim[2], box_dim[2]]],
                     color='lightblue',
                     opacity=0.6,
                     showscale=False
@@ -88,7 +89,6 @@ def draw_3d_pallet(box_dim, pallet_dim, boxes_per_layer, layers):
         margin=dict(l=0, r=0, b=0, t=40)
     )
     return fig
-
 if uploaded_file:
     boxes_df = pd.read_csv(uploaded_file)
     results = []
