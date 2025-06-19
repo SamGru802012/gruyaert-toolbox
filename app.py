@@ -57,7 +57,6 @@ def draw_3d_box(box_dim, product_dim, fits, box_id):
             yaxis_title='Breedte (mm)',
             zaxis_title='Hoogte (mm)'
         ),
-        title=f"3D visualisatie van Doos {box_id}",
         margin=dict(l=0, r=0, b=0, t=40)
     )
     return fig
@@ -97,13 +96,13 @@ if uploaded_file:
         total_products_per_pallet = total_boxes_per_pallet * max_units
 
         results.append(result_entry)
-        result_entry = {
         if max_units > 0:
-            rotatie_str = f"{best_rotation[0]}×{best_rotation[1]}×{best_rotation[2]}"
         else:
             rotatie_str = "Niet passend"
         result_entry = {
+            "DoosID": box_id,
             "Producten per doos": max_units,
+            "Rotatie (LxBxH)": rotatie_str,
             "Dozen per laag": box_per_layer,
             "Lagen": max_layers,
             "Dozen per pallet": total_boxes_per_pallet,
@@ -113,3 +112,11 @@ if uploaded_file:
             "Fits": best_fits,
             "OrigBoxDims": [row["Lengte_mm"], row["Breedte_mm"], row["Hoogte_mm"]]
         }
+            "Producten per doos": max_units,
+            "Dozen per laag": box_per_layer,
+            "Lagen": max_layers,
+            "Dozen per pallet": total_boxes_per_pallet,
+            "BoxDims": box_dims,
+            "ProdDims": best_rotation,
+            "Fits": best_fits,
+            "OrigBoxDims": [row["Lengte_mm"], row["Breedte_mm"], row["Hoogte_mm"]]
