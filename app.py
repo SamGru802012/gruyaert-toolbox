@@ -141,6 +141,12 @@ if uploaded_file:
     sorted_df = results_df.sort_values(by="Totale producten per pallet", ascending=False)
 
     st.subheader("🔝 Beste opties")
+
+    top_n = st.slider("🔢 Aantal topopties om te tonen", min_value=1, max_value=len(sorted_df), value=10)
+    display_df = sorted_df.head(top_n)
+    st.dataframe(display_df.drop(columns=["BoxDims", "ProdDims", "Fits", "OrigBoxDims"]), use_container_width=True)
+    top_result = display_df.iloc[0]
+
     st.dataframe(sorted_df.drop(columns=["BoxDims", "ProdDims", "Fits", "OrigBoxDims"]), use_container_width=True)
 
     top_result = sorted_df.iloc[0]
