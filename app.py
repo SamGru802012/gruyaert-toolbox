@@ -105,3 +105,48 @@ if st.button("🔍 Zoek optimale omverpakkingen"):
         st.dataframe(df_result)
     else:
         st.warning("⚠ Geen resultaten voldoen aan de opgegeven filters en marges.")
+
+
+    st.markdown("---")
+    st.subheader("📊 Visualisatie per geselecteerde omverpakking")
+
+    selected = st.selectbox("Kies een omverpakking om te visualiseren", df_result["OmverpakkingsID"])
+    selected_row = df_result[df_result["OmverpakkingsID"] == selected].iloc[0]
+
+    try:
+        import plotly.graph_objects as go
+
+        fig = go.Figure()
+
+        # Voeg dozen toe als kubussen
+        r, k, z = selected_row["Rijen"], selected_row["Kolommen"], selected_row["Lagen"]
+        l_str, b_str, h_str = selected_row["Gebruikte_orientatie"].split("×")
+        l, b, h = float(l_str), float(b_str), float(h_str)
+
+        for zi in range(z):
+            for yi in range(k):
+                for xi in range(r):
+                    fig.add_trace(go.Mesh3d(
+                        x=[xi*l, xi*l, (xi+1)*l, (xi+1)*l, xi*l, xi*l, (xi+1)*l, (xi+1)*l],
+                        y=[yi*b, (yi+1)*b, (yi+1)*b, yi*b, yi*b, (yi+1)*b, (yi+1)*b, yi*b],
+                        z=[zi*h]*4 + [(zi+1)*h]*4,
+                        color='lightblue',
+                        opacity=0.5,
+                        showscale=False
+                    ))
+
+        fig.update_layout(
+            scene=dict(
+                xaxis_title='Lengte',
+                yaxis_title='Breedte',
+                zaxis_title='Hoogte',
+                aspectmode='data'
+            ),
+            margin=dict(l=0, r=0, t=0, b=0),
+            height=600
+        )
+
+        st.plotly_chart(fig)
+
+    except Exception as e:
+        st.error(f"Fout bij visualisatie: {e}")
