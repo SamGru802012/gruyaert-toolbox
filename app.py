@@ -97,43 +97,16 @@ if uploaded_file:
         total_products_per_pallet = total_boxes_per_pallet * max_units
 
         results.append(result_entry)
+        result_entry = {
             "DoosID": box_id,
             "Producten per doos": max_units,
-        if max_units > 0:
-            rotatie_str = f"{best_rotation[0]}×{best_rotation[1]}×{best_rotation[2]}"
-        else:
-            rotatie_str = "Niet passend"
-        result_entry = {
+            "Rotatie (LxBxH)": rotatie_str,
             "Dozen per laag": box_per_layer,
             "Lagen": max_layers,
             "Dozen per pallet": total_boxes_per_pallet,
             "Totale producten per pallet": total_products_per_pallet,
             "BoxDims": box_dims,
             "ProdDims": best_rotation,
-            "Fits": best_fits
-        })
-
-    results_df = pd.DataFrame(results)
-    sorted_df = results_df.sort_values(by="Totale producten per pallet", ascending=False)
-
-    st.subheader("🔝 Beste opties")
-    st.dataframe(sorted_df.drop(columns=["BoxDims", "ProdDims", "Fits"]), use_container_width=True)
-
-    top_result = sorted_df.iloc[0]
-    st.plotly_chart(draw_3d_box(top_result.BoxDims, top_result.ProdDims, top_result.Fits, top_result.DoosID))
-
-    def convert_df(df):
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df.drop(columns=["BoxDims", "ProdDims", "Fits"]).to_excel(writer, index=False)
-        return output.getvalue()
-
-    excel_data = convert_df(sorted_df)
-    st.download_button(
-        label="💾 Download resultaten als Excel",
-        data=excel_data,
-        file_name='pallet_optimalisatie_resultaten.xlsx',
-        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-else:
-    st.info("📂 Upload een CSV-bestand om te beginnen.")
+            "Fits": best_fits,
+            "OrigBoxDims": [row["Lengte_mm"], row["Breedte_mm"], row["Hoogte_mm"]]
+        }
