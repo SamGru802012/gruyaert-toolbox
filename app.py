@@ -28,8 +28,6 @@ uploaded_file = st.file_uploader("Upload CSV met dozenvoorraad (kolommen: DoosID
 
 def draw_3d_box(box_dim, product_dim, fits, box_id):
     fig = go.Figure()
-
-    # Doos als transparant frame
     fig.add_trace(go.Mesh3d(
         x=[0, box_dim[0], box_dim[0], 0, 0, box_dim[0], box_dim[0], 0],
         y=[0, 0, box_dim[1], box_dim[1], 0, 0, box_dim[1], box_dim[1]],
@@ -38,8 +36,6 @@ def draw_3d_box(box_dim, product_dim, fits, box_id):
         color='blue',
         showscale=False
     ))
-
-    # Producten als blokjes
     for i in range(fits[0]):
         for j in range(fits[1]):
             for k in range(fits[2]):
@@ -57,7 +53,38 @@ def draw_3d_box(box_dim, product_dim, fits, box_id):
             yaxis_title='Breedte (mm)',
             zaxis_title='Hoogte (mm)'
         ),
-        title=f"3D visualisatie van Doos {box_id}",
+        title=f"3D weergave: Product in Doos ({box_id})",
+        margin=dict(l=0, r=0, b=0, t=40)
+    )
+    return fig
+
+def draw_3d_pallet(box_dim, pallet_dim, boxes_per_layer, layers):
+    fig = go.Figure()
+    count = 0
+    for layer in range(layers):
+        for i in range(pallet_dim[0] // box_dim[0]):
+            for j in range(pallet_dim[1] // box_dim[1]):
+                x_shift = i * box_dim[0]
+                y_shift = j * box_dim[1]
+                z_shift = layer * box_dim[2]
+                fig.add_trace(go.Mesh3d(
+                    x=[0, box_dim[0], box_dim[0], 0, 0, box_dim[0], box_dim[0], 0] + x_shift,
+                    y=[0, 0, box_dim[1], box_dim[1], 0, 0, box_dim[1], box_dim[1]] + y_shift,
+                    z=[0, 0, 0, 0, box_dim[2], box_dim[2], box_dim[2], box_dim[2]] + z_shift,
+                    color='lightblue',
+                    opacity=0.6,
+                    showscale=False
+                ))
+                count += 1
+                if count >= boxes_per_layer * layers:
+                    break
+    fig.update_layout(
+        scene=dict(
+            xaxis_title='Lengte (mm)',
+            yaxis_title='Breedte (mm)',
+            zaxis_title='Hoogte (mm)'
+        ),
+        title="3D weergave: Dozen op Pallet",
         margin=dict(l=0, r=0, b=0, t=40)
     )
     return fig
@@ -106,22 +133,27 @@ if uploaded_file:
             "Totale producten per pallet": total_products_per_pallet,
             "BoxDims": box_dims,
             "ProdDims": best_rotation,
-            "Fits": best_fits
+            "Fits": best_fits,
+            "OrigBoxDims": [row["Lengte_mm"], row["Breedte_mm"], row["Hoogte_mm"]]
         })
 
     results_df = pd.DataFrame(results)
     sorted_df = results_df.sort_values(by="Totale producten per pallet", ascending=False)
 
     st.subheader("🔝 Beste opties")
-    st.dataframe(sorted_df.drop(columns=["BoxDims", "ProdDims", "Fits"]), use_container_width=True)
+    st.dataframe(sorted_df.drop(columns=["BoxDims", "ProdDims", "Fits", "OrigBoxDims"]), use_container_width=True)
 
     top_result = sorted_df.iloc[0]
-    st.plotly_chart(draw_3d_box(top_result.BoxDims, top_result.ProdDims, top_result.Fits, top_result.DoosID))
+    col1, col2 = st.columns(2)
+    with col1:
+        st.plotly_chart(draw_3d_box(top_result.BoxDims, top_result.ProdDims, top_result.Fits, top_result.DoosID))
+    with col2:
+        st.plotly_chart(draw_3d_pallet(top_result.OrigBoxDims, [pallet_l, pallet_w, pallet_h], top_result["Dozen per laag"], top_result["Lagen"]))
 
     def convert_df(df):
         output = BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df.drop(columns=["BoxDims", "ProdDims", "Fits"]).to_excel(writer, index=False)
+            df.drop(columns=["BoxDims", "ProdDims", "Fits", "OrigBoxDims"]).to_excel(writer, index=False)
         return output.getvalue()
 
     excel_data = convert_df(sorted_df)
