@@ -32,8 +32,8 @@ def draw_3d_box(box_dim, product_dim, fits, box_id):
         x=[0, box_dim[0], box_dim[0], 0, 0, box_dim[0], box_dim[0], 0],
         y=[0, 0, box_dim[1], box_dim[1], 0, 0, box_dim[1], box_dim[1]],
         z=[0, 0, 0, 0, box_dim[2], box_dim[2], box_dim[2], box_dim[2]],
-        opacity=0.1,
-        color='blue',
+        opacity=0.2,
+        color='lightblue',
         showscale=False
     ))
     for i in range(fits[0]):
@@ -43,8 +43,8 @@ def draw_3d_box(box_dim, product_dim, fits, box_id):
                     x=[0, product_dim[0], product_dim[0], 0, 0, product_dim[0], product_dim[0], 0] + i * [product_dim[0]],
                     y=[0, 0, product_dim[1], product_dim[1], 0, 0, product_dim[1], product_dim[1]] + j * [product_dim[1]],
                     z=[0, 0, 0, 0, product_dim[2], product_dim[2], product_dim[2], product_dim[2]] + k * [product_dim[2]],
-                    color='orange',
-                    opacity=0.7,
+                    color='darkorange',
+                    opacity=1.0,
                     showscale=False
                 ))
     fig.update_layout(
@@ -54,9 +54,21 @@ def draw_3d_box(box_dim, product_dim, fits, box_id):
             zaxis_title='Hoogte (mm)'
         ),
         title=f"3D weergave: Product in Doos ({box_id})",
-        margin=dict(l=0, r=0, b=0, t=40)
+        margin=dict(l=0, r=0, b=0, t=40),
+        scene_camera=dict(eye=dict(x=1.5, y=1.5, z=1.2))
     )
+    
+    # Voeg labels toe voor de eerste N dozen
+    fig.add_trace(go.Scatter3d(
+        x=[(i * box_dim[0]) + box_dim[0]/2 for i in range(min(5, pallet_dim[0] // box_dim[0]))],
+        y=[box_dim[1]/2]*min(5, pallet_dim[0] // box_dim[0]),
+        z=[box_dim[2]*layers + 20]*min(5, pallet_dim[0] // box_dim[0]),
+        mode='text',
+        text=[f'Doos {i+1}' for i in range(min(5, pallet_dim[0] // box_dim[0]))],
+        textposition='top center'
+    ))
     return fig
+    
 
 
 def draw_3d_pallet(box_dim, pallet_dim, boxes_per_layer, layers):
@@ -86,9 +98,21 @@ def draw_3d_pallet(box_dim, pallet_dim, boxes_per_layer, layers):
             zaxis_title='Hoogte (mm)'
         ),
         title="3D weergave: Dozen op Pallet",
-        margin=dict(l=0, r=0, b=0, t=40)
+        margin=dict(l=0, r=0, b=0, t=40),
+        scene_camera=dict(eye=dict(x=1.5, y=1.5, z=1.2))
     )
+    
+    # Voeg labels toe voor de eerste N dozen
+    fig.add_trace(go.Scatter3d(
+        x=[(i * box_dim[0]) + box_dim[0]/2 for i in range(min(5, pallet_dim[0] // box_dim[0]))],
+        y=[box_dim[1]/2]*min(5, pallet_dim[0] // box_dim[0]),
+        z=[box_dim[2]*layers + 20]*min(5, pallet_dim[0] // box_dim[0]),
+        mode='text',
+        text=[f'Doos {i+1}' for i in range(min(5, pallet_dim[0] // box_dim[0]))],
+        textposition='top center'
+    ))
     return fig
+    
 if uploaded_file:
     boxes_df = pd.read_csv(uploaded_file)
     results = []
@@ -144,7 +168,7 @@ if uploaded_file:
 
     top_n = st.slider("🔢 Aantal topopties om te tonen", min_value=1, max_value=len(sorted_df), value=10)
     display_df = sorted_df.head(top_n)
-    st.dataframe(display_df.drop(columns=["BoxDims", "ProdDims", "Fits", "OrigBoxDims"]), use_container_width=True)
+    st.data_editor(display_df.drop(columns=["BoxDims", "ProdDims", "Fits", "OrigBoxDims"]), use_container_width=True, num_rows="dynamic")
     top_result = display_df.iloc[0]
 
     st.dataframe(sorted_df.drop(columns=["BoxDims", "ProdDims", "Fits", "OrigBoxDims"]), use_container_width=True)
@@ -163,7 +187,33 @@ if uploaded_file:
         return output.getvalue()
 
     excel_data = convert_df(sorted_df)
-    st.download_button(
+    
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from tempfile import NamedTemporaryFile
+import plotly.io as pio
+
+# PDF-export knop
+if st.button("📄 Exporteer topresultaat naar PDF"):
+    fig = draw_3d_pallet(top_result.OrigBoxDims, [pallet_l, pallet_w, pallet_h], top_result["Dozen per laag"], top_result["Lagen"])
+    with NamedTemporaryFile(delete=False, suffix=".png") as tmp_img:
+        pio.write_image(fig, tmp_img.name, format="png", width=800, height=600)
+        image_path = tmp_img.name
+
+    pdf_file = BytesIO()
+    c = canvas.Canvas(pdf_file, pagesize=A4)
+    c.setFont("Helvetica", 12)
+    c.drawString(50, 800, f"Pallet Optimalisatie Rapport")
+    c.drawString(50, 780, f"Top Doos ID: {top_result.DoosID}")
+    c.drawString(50, 760, f"Producten per Doos: {top_result['Producten per doos']}")
+    c.drawString(50, 740, f"Totale producten per pallet: {top_result['Totale producten per pallet']}")
+    c.drawImage(image_path, 50, 400, width=500, height=300)
+    c.save()
+    pdf_file.seek(0)
+
+    st.download_button("📥 Download PDF", data=pdf_file, file_name="pallet_rapport.pdf", mime="application/pdf")
+
+st.download_button(
         label="💾 Download resultaten als Excel",
         data=excel_data,
         file_name='pallet_optimalisatie_resultaten.xlsx',
