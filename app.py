@@ -97,6 +97,7 @@ if uploaded_file:
 
         results.append(result_entry)
         if max_units > 0:
+            rotatie_str = f"{best_rotation[0]}×{best_rotation[1]}×{best_rotation[2]}"
         else:
             rotatie_str = "Niet passend"
         result_entry = {
@@ -112,11 +113,3 @@ if uploaded_file:
             "Fits": best_fits,
             "OrigBoxDims": [row["Lengte_mm"], row["Breedte_mm"], row["Hoogte_mm"]]
         }
-            "Producten per doos": max_units,
-            "Dozen per laag": box_per_layer,
-            "Lagen": max_layers,
-            "Dozen per pallet": total_boxes_per_pallet,
-            "BoxDims": box_dims,
-            "ProdDims": best_rotation,
-            "Fits": best_fits,
-            "OrigBoxDims": [row["Lengte_mm"], row["Breedte_mm"], row["Hoogte_mm"]]
