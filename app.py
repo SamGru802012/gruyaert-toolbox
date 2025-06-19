@@ -191,6 +191,25 @@ if uploaded_file:
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from tempfile import NamedTemporaryFile
+
+# PDF-export knop
+if st.button("📄 Exporteer topresultaat naar PDF"):
+    pdf_file = BytesIO()
+    c = canvas.Canvas(pdf_file, pagesize=A4)
+    c.setFont("Helvetica", 12)
+    c.drawString(50, 800, f"Pallet Optimalisatie Rapport")
+    c.drawString(50, 780, f"Top Doos ID: {top_result.DoosID}")
+    c.drawString(50, 760, f"Producten per Doos: {top_result['Producten per doos']}")
+    c.drawString(50, 740, f"Rotatie: {top_result['Rotatie (LxBxH)']}")
+    c.drawString(50, 720, f"Totale producten per pallet: {top_result['Totale producten per pallet']}")
+    c.drawString(50, 700, f"Dozen per laag: {top_result['Dozen per laag']}")
+    c.drawString(50, 680, f"Lagen: {top_result['Lagen']}")
+    c.save()
+    pdf_file.seek(0)
+
+    st.download_button("📥 Download PDF", data=pdf_file, file_name="pallet_rapport.pdf", mime="application/pdf")
+from reportlab.pdfgen import canvas
+from tempfile import NamedTemporaryFile
 import plotly.io as pio
 
 # PDF-export knop
