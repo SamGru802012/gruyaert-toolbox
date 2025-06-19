@@ -261,5 +261,4 @@ st.download_button(
         file_name='pallet_optimalisatie_resultaten.xlsx',
         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-else:
     st.info("📂 Upload een CSV-bestand om te beginnen.")
