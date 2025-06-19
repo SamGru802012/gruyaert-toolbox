@@ -98,9 +98,12 @@ if uploaded_file:
 
         results.append(result_entry)
         result_entry = {
-            "DoosID": box_id,
+        if max_units > 0:
+            rotatie_str = f"{best_rotation[0]}×{best_rotation[1]}×{best_rotation[2]}"
+        else:
+            rotatie_str = "Niet passend"
+        result_entry = {
             "Producten per doos": max_units,
-            "Rotatie (LxBxH)": rotatie_str,
             "Dozen per laag": box_per_layer,
             "Lagen": max_layers,
             "Dozen per pallet": total_boxes_per_pallet,
