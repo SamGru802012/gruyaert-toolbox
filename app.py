@@ -132,4 +132,4 @@ if uploaded_file:
         mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
 else:
-st.info("📂 Upload een CSV-bestand om te beginnen.")
+    st.info("📂 Upload een CSV-bestand om te beginnen.")
