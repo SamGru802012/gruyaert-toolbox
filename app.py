@@ -96,10 +96,14 @@ if uploaded_file:
         total_boxes_per_pallet = box_per_layer * max_layers
         total_products_per_pallet = total_boxes_per_pallet * max_units
 
-        results.append({
+        results.append(result_entry)
             "DoosID": box_id,
             "Producten per doos": max_units,
-            "Rotatie (LxBxH)": f"{best_rotation[0]}×{best_rotation[1]}×{best_rotation[2]}",
+        if max_units > 0:
+            rotatie_str = f"{best_rotation[0]}×{best_rotation[1]}×{best_rotation[2]}"
+        else:
+            rotatie_str = "Niet passend"
+        result_entry = {
             "Dozen per laag": box_per_layer,
             "Lagen": max_layers,
             "Dozen per pallet": total_boxes_per_pallet,
