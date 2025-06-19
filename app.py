@@ -191,6 +191,29 @@ if uploaded_file:
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from tempfile import NamedTemporaryFile
+import plotly.io as pio
+
+# PDF-export knop
+if st.button("📄 Exporteer topresultaat naar PDF"):
+    fig = draw_3d_pallet(top_result.OrigBoxDims, [pallet_l, pallet_w, pallet_h], top_result["Dozen per laag"], top_result["Lagen"])
+    with NamedTemporaryFile(delete=False, suffix=".png") as tmp_img:
+        pio.write_image(fig, tmp_img.name, format="png", width=800, height=600)
+        image_path = tmp_img.name
+
+    pdf_file = BytesIO()
+    c = canvas.Canvas(pdf_file, pagesize=A4)
+    c.setFont("Helvetica", 12)
+    c.drawString(50, 800, f"Pallet Optimalisatie Rapport")
+    c.drawString(50, 780, f"Top Doos ID: {top_result.DoosID}")
+    c.drawString(50, 760, f"Producten per Doos: {top_result['Producten per doos']}")
+    c.drawString(50, 740, f"Totale producten per pallet: {top_result['Totale producten per pallet']}")
+    c.drawImage(image_path, 50, 400, width=500, height=300)
+    c.save()
+    pdf_file.seek(0)
+
+    st.download_button("📥 Download PDF", data=pdf_file, file_name="pallet_rapport.pdf", mime="application/pdf")
+from reportlab.pdfgen import canvas
+from tempfile import NamedTemporaryFile
 
 # PDF-export knop
 if st.button("📄 Exporteer topresultaat naar PDF"):
