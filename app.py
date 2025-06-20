@@ -60,6 +60,7 @@ if st.button("🔍 Zoek optimale omverpakkingen"):
 
     df = df_raw.copy()
     resultaten = []
+    uitsluitingen = []
 
     orientations = [
         (pl, pb, ph),
@@ -86,20 +87,34 @@ if st.button("🔍 Zoek optimale omverpakkingen"):
             hoogte_gebruikt = z * h
             totale_pallet_hoogte = hoogte_gebruikt + pallet_height_base
 
-            if aantal > 0 and totale_pallet_hoogte <= pallet_height_max:
-                score = aantal * l * b * h
-                if "score" not in best or score > best["score"]:
-                    best = {
-                        "OmverpakkingsID": box_id,
-                        "Omverpakking_afmetingen": f"{int(row['Lengte_mm'])}×{int(row['Breedte_mm'])}×{int(row['Hoogte_mm'])}",
-                        "Gebruikte_orientatie": f"{l}×{b}×{h}",
-                        "Rijen": r,
-                        "Kolommen": k,
-                        "Lagen": z,
-                        "Aantal": aantal,
-                        "Totale hoogte (mm)": totale_pallet_hoogte,
-                        "Score": score
-                    }
+            if aantal == 0:
+                uitsluitingen.append({
+                    "OmverpakkingsID": box_id,
+                    "Reden": "Aantal = 0",
+                    "Afmetingen na verlies": f"{usable_l}×{usable_b}×{usable_h}"
+                })
+                continue
+            if totale_pallet_hoogte > pallet_height_max:
+                uitsluitingen.append({
+                    "OmverpakkingsID": box_id,
+                    "Reden": f"Overschrijdt max hoogte ({totale_pallet_hoogte} > {pallet_height_max})",
+                    "Afmetingen na verlies": f"{usable_l}×{usable_b}×{usable_h}"
+                })
+                continue
+
+            score = aantal * l * b * h
+            if "score" not in best or score > best["score"]:
+                best = {
+                    "OmverpakkingsID": box_id,
+                    "Omverpakking_afmetingen": f"{int(row['Lengte_mm'])}×{int(row['Breedte_mm'])}×{int(row['Hoogte_mm'])}",
+                    "Gebruikte_orientatie": f"{l}×{b}×{h}",
+                    "Rijen": r,
+                    "Kolommen": k,
+                    "Lagen": z,
+                    "Aantal": aantal,
+                    "Totale hoogte (mm)": totale_pallet_hoogte,
+                    "Score": score
+                }
 
         if "score" in best:
             resultaten.append(best)
@@ -150,3 +165,20 @@ if st.button("🔍 Zoek optimale omverpakkingen"):
             st.error(f"Fout bij visualisatie: {e}")
     else:
         st.warning("⚠ Geen resultaten voldoen aan de opgegeven filters en marges.")
+
+    if uitsluitingen:
+        if st.checkbox("🔍 Toon uitgesloten omverpakkingen en reden"):
+            st.dataframe(pd.DataFrame(uitsluitingen))
+
+
+if uitsluitingen:
+    if st.checkbox("🔍 Toon uitgesloten omverpakkingen en reden"):
+        df_uitsluit = pd.DataFrame(uitsluitingen)
+        st.dataframe(df_uitsluit)
+        csv_uitsluit = df_uitsluit.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "📥 Download uitsluitingen als CSV",
+            data=csv_uitsluit,
+            file_name="uitsluitingen_export.csv",
+            mime="text/csv"
+        )
