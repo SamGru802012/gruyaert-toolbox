@@ -1,1 +1,2 @@
-# Hier komt de volledig heropgebouwde app.py met alle functionaliteiten
+# Hier komt de volledige heropgebouwde app.py
+# Inclusief alle functionaliteiten zoals besproken.
