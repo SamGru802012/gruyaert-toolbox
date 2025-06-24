@@ -51,7 +51,11 @@ else:
                     "ID": oid, "Lengte": ol, "Breedte": ob, "Hoogte": oh
                 }])], ignore_index=True)
     df = st.session_state["dozen"]
-    st.dataframe(df)
+    df_display = df.copy()
+df_display['Binnen_L'] = df_display['Lengte'] - marge_l
+df_display['Binnen_B'] = df_display['Breedte'] - marge_b
+df_display['Binnen_H'] = df_display['Hoogte'] - marge_h
+st.dataframe(df_display)
 
 # Detect kolommen
 def detect(df, name):
