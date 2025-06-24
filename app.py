@@ -2,99 +2,134 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from itertools import product
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="Gruyaert Toolbox", layout="wide")
+st.set_page_config(layout="wide")
+st.title("📦 Gruyaert Toolbox — Verpakking Optimalisatie")
 
-st.title("📦 Gruyaert Verpakkingsoptimalisatie")
+tab1, tab2 = st.tabs(["🔍 Optimalisatie", "🗂️ Beheer Omverpakking"])
 
-# Invoer product
-st.sidebar.header("📥 Productafmetingen")
-prod_l = st.sidebar.number_input("Lengte (mm)", min_value=1, value=100)
-prod_b = st.sidebar.number_input("Breedte (mm)", min_value=1, value=100)
-prod_h = st.sidebar.number_input("Hoogte (mm)", min_value=1, value=100)
-prod_ref = st.sidebar.text_input("Referentie", value="Product X")
+def nummer_ids(df):
+    df = df.reset_index(drop=True)
+    df["DoosID"] = [f"OMV{i+1:03}" for i in range(len(df))]
+    return df
 
-# Marges in verpakking
-st.sidebar.header("📐 Marges in omverpakking")
-marge_l = st.sidebar.number_input("Marge lengte", min_value=0, value=0)
-marge_b = st.sidebar.number_input("Marge breedte", min_value=0, value=0)
-marge_h = st.sidebar.number_input("Marge hoogte", min_value=0, value=0)
+# === TAB 2: Beheer ===
+with tab2:
+    st.header("🗂️ Omverpakking Data Beheer")
 
-# Max beperkingen
-st.sidebar.header("📊 Verdeelbeperkingen")
-max_rijen = st.sidebar.number_input("Max rijen", min_value=0, value=10)
-max_kolommen = st.sidebar.number_input("Max kolommen", min_value=0, value=10)
-max_lagen = st.sidebar.number_input("Max lagen", min_value=0, value=10)
+    uploaded_file = st.file_uploader("Upload CSV", type=["csv"], key="beheer_csv")
 
-# CSV of interactieve input
-st.sidebar.header("📁 Omverpakking")
-data_source = st.sidebar.radio("Gegevensbron", ["Upload CSV", "Invoer via app"])
-csv_file = st.sidebar.file_uploader("CSV bestand", type="csv") if data_source == "Upload CSV" else None
+    if "data_beheer" not in st.session_state:
+        st.session_state.data_beheer = pd.DataFrame(columns=["Lengte", "Breedte", "Hoogte", "Dikte", "Stock", "Referentie"])
 
-# Invoerdata
-if data_source == "Upload CSV" and csv_file:
-    df = pd.read_csv(csv_file)
-elif data_source == "Invoer via app":
-    df = pd.DataFrame([
-        {"DoosID": "Test1", "Lengte": 400, "Breedte": 300, "Hoogte": 200},
-        {"DoosID": "Test2", "Lengte": 500, "Breedte": 350, "Hoogte": 300}
-    ])
-else:
-    df = pd.DataFrame()
+    if uploaded_file:
+        df_beheer = pd.read_csv(uploaded_file)
+        if "DoosID" not in df_beheer.columns:
+            df_beheer = nummer_ids(df_beheer)
+        st.session_state.data_beheer = df_beheer
 
-# Marges toepassen
-if not df.empty:
-    df["Binnen_L"] = df["Lengte"] - marge_l
-    df["Binnen_B"] = df["Breedte"] - marge_b
-    df["Binnen_H"] = df["Hoogte"] - marge_h
-    st.subheader("📋 Overzicht omverpakking")
-    st.dataframe(df)
+    st.markdown("📝 **Bewerk hieronder je data.** Nieuw record toevoegen = lege rij invullen onderaan.")
+    
+edited_df = st.session_state.data_beheer.drop(columns=["DoosID"], errors="ignore").copy()
+edited_df["🗑️ Verwijder"] = False
 
-    results = []
-    for _, row in df.iterrows():
-        binnen_l, binnen_b, binnen_h = row["Binnen_L"], row["Binnen_B"], row["Binnen_H"]
-        best = {"DoosID": row["DoosID"], "Aantal": 0}
-        for r in range(1, max_rijen+1):
-            for k in range(1, max_kolommen+1):
-                for z in range(1, max_lagen+1):
-                    needed_l = r * prod_l
-                    needed_b = k * prod_b
-                    needed_h = z * prod_h
-                    if needed_l <= binnen_l and needed_b <= binnen_b and needed_h <= binnen_h:
-                        aantal = r * k * z
-                        if aantal > best["Aantal"]:
-                            best = {"DoosID": row["DoosID"], "Aantal": aantal, "Rijen": r, "Kolommen": k, "Lagen": z}
-        results.append(best)
+edited_df = st.data_editor(
 
-    df_results = pd.DataFrame(results)
-    st.subheader("✅ Beste verpakkingsopties")
-    st.dataframe(df_results)
+        st.session_state.data_beheer.drop(columns=["DoosID"], errors="ignore"),
+        num_rows="dynamic",
+        use_container_width=True,
+        key="beheer_editor"
+    )
 
-    if not df_results.empty:
-        gekozen = st.selectbox("Toon visualisatie voor:", df_results["DoosID"])
-        selected = df_results[df_results["DoosID"] == gekozen].iloc[0]
+    # Voeg ID opnieuw toe
+    
+edited_df = edited_df[edited_df["🗑️ Verwijder"] == False].drop(columns=["🗑️ Verwijder"])
+updated_df = nummer_ids(edited_df)
+
+    st.session_state.data_beheer = updated_df
+
+    st.dataframe(updated_df)
+
+    if st.button("💾 Opslaan als CSV"):
+        csv = updated_df.to_csv(index=False).encode("utf-8")
+        st.download_button("⬇️ Download", csv, file_name="omverpakking_dataset.csv", mime="text/csv")
+
+# === TAB 1: Optimalisatie ===
+with tab1:
+    st.header("🔍 Optimalisatie")
+
+    if st.session_state.data_beheer.empty:
+        st.warning("⚠️ Voeg eerst dozen toe in het tabblad 'Beheer Omverpakking'")
+        st.stop()
+
+    df = st.session_state.data_beheer.copy()
+    l = st.number_input("Lengte product (mm)", min_value=1, value=100)
+    b = st.number_input("Breedte product (mm)", min_value=1, value=80)
+    h = st.number_input("Hoogte product (mm)", min_value=1, value=60)
+    ref = st.text_input("📌 Productreferentie", value="Product X")
+
+    marge_l = st.number_input("Marge lengte (mm)", 0, 100, 0)
+    marge_b = st.number_input("Marge breedte (mm)", 0, 100, 0)
+    marge_h = st.number_input("Marge hoogte (mm)", 0, 100, 0)
+
+    max_r = st.number_input("Max rijen", 0, 100, 10)
+    max_k = st.number_input("Max kolommen", 0, 100, 10)
+    max_l = st.number_input("Max lagen", 0, 100, 10)
+
+    resultaten = []
+
+    for idx, row in df.iterrows():
+        bin_l = row["Lengte"] - marge_l
+        bin_b = row["Breedte"] - marge_b
+        bin_h = row["Hoogte"] - marge_h
+
+        opties = []
+        for r in range(1, int(bin_l // l) + 1):
+            if max_r and r > max_r: continue
+            for k in range(1, int(bin_b // b) + 1):
+                if max_k and k > max_k: continue
+                for z in range(1, int(bin_h // h) + 1):
+                    if max_l and z > max_l: continue
+                    aantal = r * k * z
+                    volume_producten = aantal * l * b * h
+                    volume_doos = row["Lengte"] * row["Breedte"] * row["Hoogte"]
+                    efficiëntie = volume_producten / volume_doos
+                    opties.append((aantal, efficiëntie, r, k, z))
+
+        if opties:
+            best = max(opties, key=lambda x: (x[0], x[1]))
+            resultaten.append({
+                "DoosID": row["DoosID"],
+                "Aantal": best[0],
+                "Efficiëntie": round(best[1]*100, 2),
+                "Rijen": best[2],
+                "Kolommen": best[3],
+                "Lagen": best[4]
+            })
+
+    if resultaten:
+        df_res = pd.DataFrame(resultaten)
+        st.dataframe(df_res)
+
+        keuze = st.selectbox("📦 Visualiseer omdoos", df_res["DoosID"])
+        selected = df_res[df_res["DoosID"] == keuze].iloc[0]
+
         fig = go.Figure()
-        kleuren = ["red", "green", "blue", "orange", "purple", "cyan", "magenta"]
-        idx = 0
+        kleuren = ["red", "green", "blue", "orange"]
         for x in range(selected["Rijen"]):
             for y in range(selected["Kolommen"]):
                 for z in range(selected["Lagen"]):
                     fig.add_trace(go.Mesh3d(
-                        x=[x*prod_l, (x+1)*prod_l, (x+1)*prod_l, x*prod_l]*2,
-                        y=[y*prod_b, y*prod_b, (y+1)*prod_b, (y+1)*prod_b]*2,
-                        z=[z*prod_h]*4 + [(z+1)*prod_h]*4,
-                        color=kleuren[idx % len(kleuren)],
+                        x=[x*l, (x+1)*l, (x+1)*l, x*l]*2,
+                        y=[y*b, y*b, (y+1)*b, (y+1)*b]*2,
+                        z=[z*h]*4 + [(z+1)*h]*4,
+                        color=kleuren[(x+y+z) % len(kleuren)],
                         opacity=0.7,
                         alphahull=0
                     ))
-                    idx += 1
-        fig.update_layout(scene=dict(
-            xaxis_title="Lengte",
-            yaxis_title="Breedte",
-            zaxis_title="Hoogte"
-        ), title="3D visualisatie van producten in omdoos")
+        fig.update_layout(scene=dict(xaxis_title="L", yaxis_title="B", zaxis_title="H"))
         st.plotly_chart(fig)
-else:
-    st.info("📎 Upload een CSV of gebruik invoer via de app.")
+
+    else:
+        st.warning("❌ Geen geschikte combinaties gevonden.")
