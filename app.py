@@ -97,14 +97,17 @@ if uploaded_file:
             selected = st.selectbox("📦 Kies omverpakking voor visualisatie", df_result["OmverpakkingID"])
             sel = df_result[df_result["OmverpakkingID"] == selected].iloc[0]
 
-            r, k, z = sel["Rijen"], sel["Kolommen"], sel["Lagen"]
+            r, k, z = int(sel["Rijen"]), int(sel["Kolommen"]), int(sel["Lagen"])
+            kleuren = ["#1f77b4", "#2ca02c", "#d62728", "#9467bd", "#ff7f0e", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
 
-            
+            fig = go.Figure()
+            for zi in range(z):
                 for yi in range(k):
                     for xi in range(r):
                         x0, x1 = xi * prod_l, (xi + 1) * prod_l
                         y0, y1 = yi * prod_b, (yi + 1) * prod_b
                         z0, z1 = zi * prod_h, (zi + 1) * prod_h
+                        kleur = kleuren[(zi + yi + xi) % len(kleuren)]
                         fig.add_trace(go.Mesh3d(
                             x=[x0,x1,x1,x0,x0,x1,x1,x0],
                             y=[y0,y0,y1,y1,y0,y0,y1,y1],
@@ -112,11 +115,12 @@ if uploaded_file:
                             i=[0, 0, 0, 1, 1, 2],
                             j=[1, 2, 3, 2, 3, 3],
                             k=[2, 3, 1, 5, 7, 6],
-                            opacity=0.4,
-                            color="skyblue",
+                            opacity=0.5,
+                            color=kleur,
                             showscale=False
                         ))
-            st.plotly_chart(fig, use_container_width=True)
+            fig.update_layout(scene=dict(
+                xaxis_title="Lengte",
                 yaxis_title="Breedte",
                 zaxis_title="Hoogte",
                 aspectmode="data"
