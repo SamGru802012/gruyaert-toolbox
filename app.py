@@ -4,141 +4,99 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="Gruyaert Toolbox", layout="wide")
-st.title("📦 Gruyaert Verpakking Optimalisatie")
+st.set_page_config(layout="wide")
+st.title("📦 Gruyaert Verpakkingsoptimalisatie Tool")
 
-uploaded_file = st.file_uploader("Upload een CSV met omverpakkingen", type=["csv"])
-if not uploaded_file:
-    st.stop()
+st.sidebar.header("🔧 Invoerparameters")
 
-try:
-    df_raw = pd.read_csv(uploaded_file)
-    st.success("✅ Bestand geladen")
-except Exception as e:
-    st.error(f"Fout bij laden CSV: {e}")
-    st.stop()
+# PRODUCTGEGEVENS
+product_ref = st.sidebar.text_input("Referentie product", value="PRD-001")
+prod_l = st.sidebar.number_input("Lengte (mm)", min_value=1, value=100)
+prod_b = st.sidebar.number_input("Breedte (mm)", min_value=1, value=80)
+prod_h = st.sidebar.number_input("Hoogte (mm)", min_value=1, value=60)
 
-tab1, tab2, tab3 = st.tabs(["📐 Verpakking", "⚠️ Uitsluitingen", "📤 Export"])
+# SPATIES
+st.sidebar.markdown("### Marges in omverpakking (ruimte die moet blijven)")
+marge_l = st.sidebar.number_input("Marge links/rechts (mm)", min_value=0, value=0)
+marge_b = st.sidebar.number_input("Marge voor/achter (mm)", min_value=0, value=0)
+marge_h = st.sidebar.number_input("Marge boven/onder (mm)", min_value=0, value=0)
 
-with tab1:
-    pl = st.number_input("Lengte", min_value=1, value=200)
-    pb = st.number_input("Breedte", min_value=1, value=150)
-    ph = st.number_input("Hoogte", min_value=1, value=100)
+# LIMITS
+st.sidebar.markdown("### Maximumverdeling per omverpakking")
+max_rijen = st.sidebar.slider("Max. rijen (L)", 1, 10, 10)
+max_kolommen = st.sidebar.slider("Max. kolommen (B)", 1, 10, 10)
+max_lagen = st.sidebar.slider("Max. lagen (H)", 1, 10, 10)
 
-    sl = st.number_input("Spatie lengte", min_value=0, value=0)
-    sb = st.number_input("Spatie breedte", min_value=0, value=20)
-    sh = st.number_input("Spatie hoogte", min_value=0, value=0)
+# PALLET
+st.sidebar.markdown("### Pallethoogte instellingen")
+pallet_hoogte = st.sidebar.number_input("Max. totale pallethoogte (mm)", min_value=100, value=1200)
+pallet_hoogte_zonder_lading = st.sidebar.number_input("Hoogte lege pallet (mm)", min_value=0, value=150)
 
-    pallet_height_base = st.number_input("Hoogte lege pallet", value=150)
-    pallet_height_max = st.number_input("Max. pallethoogte incl. goederen", value=1800)
+# CSV upload
+st.sidebar.markdown("### 📥 Upload omverpakking CSV")
+uploaded_file = st.sidebar.file_uploader("Omverpakking CSV", type=["csv"])
 
-    resultaten = []
-    uitsluitingen = []
+if uploaded_file:
+    df = pd.read_csv(uploaded_file)
 
-    if st.button("🔍 Zoek optimale omverpakkingen"):
-        df = df_raw.copy()
-        orientations = [(pl, pb, ph), (pl, ph, pb), (pb, pl, ph), (pb, ph, pl), (ph, pl, pb), (ph, pb, pl)]
+    # Probeer kolommen te herkennen ongeacht de naam
+    def find_col(name):
+        for col in df.columns:
+            if name.lower() in col.lower():
+                return col
+        return None
+
+    col_l = find_col("lengte")
+    col_b = find_col("breedte")
+    col_h = find_col("hoogte")
+    col_id = find_col("id") or find_col("ref")
+
+    if None in [col_l, col_b, col_h, col_id]:
+        st.error("❌ Kan de juiste kolommen niet herkennen. Zorg dat je CSV lengte, breedte, hoogte en ID bevat.")
+    else:
+        results = []
 
         for idx, row in df.iterrows():
-            box_id = row.get("DoosID", row.get("OmverpakkingsID", f"DOOS-{idx+1}"))
-            usable_l = row["Lengte_mm"] - sl
-            usable_b = row["Breedte_mm"] - sb
-            usable_h = row["Hoogte_mm"] - sh
+            in_l = row[col_l] - marge_l
+            in_b = row[col_b] - marge_b
+            in_h = row[col_h] - marge_h
 
-            best = {}
-            for l, b, h in orientations:
-                r = int(usable_l // l)
-                k = int(usable_b // b)
-                z = int(usable_h // h)
-                aantal = r * k * z
-                hoogte = z * h + pallet_height_base
+            if in_l <= 0 or in_b <= 0 or in_h <= 0:
+                continue
 
-                if aantal == 0:
-                    uitsluitingen.append({"ID": box_id, "Reden": "Aantal = 0"})
-                    continue
-                if hoogte > pallet_height_max:
-                    uitsluitingen.append({"ID": box_id, "Reden": f"Pallet te hoog ({hoogte})"})
-                    continue
+            fits_l = int(in_l // prod_l)
+            fits_b = int(in_b // prod_b)
+            fits_h = int(in_h // prod_h)
 
-                score = aantal
-                if "score" not in best or score > best["score"]:
-                    best = {
-                        "OmverpakkingsID": box_id,
-                        "Config": f"{l}×{b}×{h}",
-                        "Rijen": r,
-                        "Kolommen": k,
-                        "Lagen": z,
-                        "Aantal": aantal,
-                        "Hoogte (mm)": hoogte,
-                        "Score": score
-                    }
+            fits_l = min(fits_l, max_rijen)
+            fits_b = min(fits_b, max_kolommen)
+            fits_h = min(fits_h, max_lagen)
 
-            if best:
-                resultaten.append(best)
+            if fits_l * fits_b * fits_h == 0:
+                continue
 
-        if resultaten:
-            df_result = pd.DataFrame(resultaten).sort_values("Score", ascending=False)
-            st.success(f"{len(df_result)} resultaten gevonden.")
-            st.dataframe(df_result)
+            total = fits_l * fits_b * fits_h
+            eff = round((total * prod_l * prod_b * prod_h) / (row[col_l]*row[col_b]*row[col_h]) * 100, 2)
 
-            csv = df_result.to_csv(index=False).encode("utf-8")
-            st.download_button("📥 Download resultaten als CSV", data=csv, file_name="verpakkingsresultaten.csv", mime="text/csv")
+            results.append({
+                "ID": row[col_id],
+                "LxBxH": f"{row[col_l]}x{row[col_b]}x{row[col_h]}",
+                "Per laag": fits_l * fits_b,
+                "Lagen": fits_h,
+                "Totaal stuks": total,
+                "Volume-efficiëntie (%)": eff
+            })
 
-            st.subheader("📊 Visualisatie")
-            selected = st.selectbox("Kies een omverpakking", df_result["OmverpakkingsID"], key="vis_select")
-            sel = df_result[df_result["OmverpakkingsID"] == selected].iloc[0]
-            r, k, z = sel["Rijen"], sel["Kolommen"], sel["Lagen"]
-            l, b, h = map(float, sel["Config"].split("×"))
+        if results:
+            res_df = pd.DataFrame(results).sort_values("Volume-efficiëntie (%)", ascending=False)
+            st.subheader(f"📊 Resultaten voor product **{product_ref}**")
+            st.dataframe(res_df)
 
-            fig = go.Figure()
-            for zi in range(z):
-                for yi in range(k):
-                    for xi in range(r):
-                        fig.add_trace(go.Mesh3d(
-                            x=[xi*l, xi*l, (xi+1)*l, (xi+1)*l, xi*l, xi*l, (xi+1)*l, (xi+1)*l],
-                            y=[yi*b, (yi+1)*b, (yi+1)*b, yi*b, yi*b, (yi+1)*b, (yi+1)*b, yi*b],
-                            z=[zi*h]*4 + [(zi+1)*h]*4,
-                            color='lightblue', opacity=0.5, showscale=False
-                        ))
-            fig.update_layout(scene=dict(xaxis_title='L', yaxis_title='B', zaxis_title='H'), margin=dict(l=0,r=0,t=0,b=0))
-            
-# Optie: toon doorsnede
-if st.checkbox("🔍 Toon doorsnede (alleen onderste laag)"):
-    zrange = range(1)
-    zrange = range(z)
-
-fig = go.Figure()
-                for zi in range(layers):
-    for yi in range(k):
-        for xi in range(r):
-            x0, x1 = xi * l, (xi + 1) * l
-            y0, y1 = yi * b, (yi + 1) * b
-            z0, z1 = zi * h, (zi + 1) * h
-            fig.add_trace(go.Scatter3d(
-                x=[x0, x1, x1, x0, x0, None, x0, x0, x1, x1, x0, x0, None, x1, x1, x1, x1, x1, None, x0, x0, x0, x0, x0],
-                y=[y0, y0, y1, y1, y0, None, y0, y1, y1, y0, y0, y0, None, y0, y1, y1, y0, y0, None, y0, y1, y1, y0, y0],
-                z=[z0, z0, z0, z0, z0, None, z0, z0, z0, z0, z0, z1, None, z1, z1, z0, z0, z1, None, z1, z1, z0, z0, z1],
-                mode='lines',
-                line=dict(color='blue', width=2),
-                showlegend=False
-            ))
-fig.update_layout(scene=dict(
-    xaxis_title='L',
-    yaxis_title='B',
-    zaxis_title='H',
-    aspectmode='data'),
-    margin=dict(l=0, r=0, t=0, b=0)
-)
-st.plotly_chart(fig)
-
-
-with tab2:
-    st.subheader("🛑 Uitsluitingen")
-    if uitsluitingen:
-        df_uitsluit = pd.DataFrame(uitsluitingen)
-        st.dataframe(df_uitsluit)
-        st.download_button("📤 Download uitsluitingen", df_uitsluit.to_csv(index=False).encode("utf-8"), file_name="uitsluitingen.csv", mime="text/csv")
-        st.info("Geen uitsluitingen vastgesteld.")
-
-with tab3:
-    st.markdown("👉 Resultaten en uitsluitingen worden pas zichtbaar na verwerking in tabblad 1.")
+            # Visualisatie
+            selected = st.selectbox("📦 Visualiseer omverpakking", res_df["ID"])
+            box = res_df[res_df["ID"] == selected].iloc[0]
+            st.info(f"Toon {box['Totaal stuks']} stuks verdeeld over {box['Lagen']} lagen in omverpakking {selected}")
+        else:
+            st.warning("⚠ Geen geldige configuraties gevonden met deze marges en afmetingen.")
+else:
+    st.info("⏳ Upload een CSV-bestand om te starten.")
