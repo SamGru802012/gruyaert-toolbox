@@ -18,7 +18,15 @@ def nummer_ids(df):
 with tab2:
     st.header("🗂️ Omverpakking Beheer")
 
-    if "data_beheer" not in st.session_state:
+    
+default_csv = "omverpakking_dataset_definitief.csv"
+if "data_beheer" not in st.session_state:
+    try:
+        df_default = pd.read_csv(default_csv)
+        st.session_state.data_beheer = nummer_ids(df_default)
+    except:
+        st.session_state.data_beheer = pd.DataFrame(columns=["Lengte", "Breedte", "Hoogte", "Dikte", "Stock", "Referentie"])
+
         st.session_state.data_beheer = pd.DataFrame(columns=["Lengte", "Breedte", "Hoogte", "Dikte", "Stock", "Referentie"])
 
     uploaded_file = st.file_uploader("Upload CSV", type="csv")
