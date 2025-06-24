@@ -18,21 +18,17 @@ except Exception as e:
     st.error(f"Fout bij laden CSV: {e}")
     st.stop()
 
-# Tabs
 tab1, tab2, tab3 = st.tabs(["📐 Verpakking", "⚠️ Uitsluitingen", "📤 Export"])
 
 with tab1:
-    st.subheader("🔢 Productafmetingen (mm)")
     pl = st.number_input("Lengte", min_value=1, value=200)
     pb = st.number_input("Breedte", min_value=1, value=150)
     ph = st.number_input("Hoogte", min_value=1, value=100)
 
-    st.subheader("➕ Spatieverlies (aftrek van omdoos)")
     sl = st.number_input("Spatie lengte", min_value=0, value=0)
     sb = st.number_input("Spatie breedte", min_value=0, value=20)
     sh = st.number_input("Spatie hoogte", min_value=0, value=0)
 
-    st.subheader("📏 Palletinstellingen")
     pallet_height_base = st.number_input("Hoogte lege pallet", value=150)
     pallet_height_max = st.number_input("Max. pallethoogte incl. goederen", value=1800)
 
@@ -89,7 +85,7 @@ with tab1:
             st.download_button("📥 Download resultaten als CSV", data=csv, file_name="verpakkingsresultaten.csv", mime="text/csv")
 
             st.subheader("📊 Visualisatie")
-            selected = st.selectbox("Kies een omverpakking", df_result["OmverpakkingsID"])
+            selected = st.selectbox("Kies een omverpakking", df_result["OmverpakkingsID"], key="vis_select")
             sel = df_result[df_result["OmverpakkingsID"] == selected].iloc[0]
             r, k, z = sel["Rijen"], sel["Kolommen"], sel["Lagen"]
             l, b, h = map(float, sel["Config"].split("×"))
@@ -105,7 +101,37 @@ with tab1:
                             color='lightblue', opacity=0.5, showscale=False
                         ))
             fig.update_layout(scene=dict(xaxis_title='L', yaxis_title='B', zaxis_title='H'), margin=dict(l=0,r=0,t=0,b=0))
-            st.plotly_chart(fig)
+            
+# Optie: toon doorsnede
+if st.checkbox("🔍 Toon doorsnede (alleen onderste laag)"):
+    zrange = range(1)
+else:
+    zrange = range(z)
+
+fig = go.Figure()
+for zi in zrange:
+    for yi in range(k):
+        for xi in range(r):
+            x0, x1 = xi * l, (xi + 1) * l
+            y0, y1 = yi * b, (yi + 1) * b
+            z0, z1 = zi * h, (zi + 1) * h
+            fig.add_trace(go.Scatter3d(
+                x=[x0, x1, x1, x0, x0, None, x0, x0, x1, x1, x0, x0, None, x1, x1, x1, x1, x1, None, x0, x0, x0, x0, x0],
+                y=[y0, y0, y1, y1, y0, None, y0, y1, y1, y0, y0, y0, None, y0, y1, y1, y0, y0, None, y0, y1, y1, y0, y0],
+                z=[z0, z0, z0, z0, z0, None, z0, z0, z0, z0, z0, z1, None, z1, z1, z0, z0, z1, None, z1, z1, z0, z0, z1],
+                mode='lines',
+                line=dict(color='blue', width=2),
+                showlegend=False
+            ))
+fig.update_layout(scene=dict(
+    xaxis_title='L',
+    yaxis_title='B',
+    zaxis_title='H',
+    aspectmode='data'),
+    margin=dict(l=0, r=0, t=0, b=0)
+)
+st.plotly_chart(fig)
+
         else:
             st.warning("⚠ Geen geldige configuraties gevonden.")
 
