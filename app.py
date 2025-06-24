@@ -86,7 +86,7 @@ if None in [col_l, col_b, col_h, col_id]:
 # Berekening
 resultaten = []
 for _, row in df.iterrows():
- 
+
     in_l = row[col_l] - marge_l
     in_b = row[col_b] - marge_b
     in_h = row[col_h] - marge_h
