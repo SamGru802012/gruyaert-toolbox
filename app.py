@@ -99,8 +99,7 @@ if uploaded_file:
 
             r, k, z = sel["Rijen"], sel["Kolommen"], sel["Lagen"]
 
-            fig = go.Figure()
-            for zi in range(z):
+            
                 for yi in range(k):
                     for xi in range(r):
                         x0, x1 = xi * prod_l, (xi + 1) * prod_l
@@ -117,8 +116,7 @@ if uploaded_file:
                             color="skyblue",
                             showscale=False
                         ))
-            fig.update_layout(scene=dict(
-                xaxis_title="Lengte",
+            st.plotly_chart(fig, use_container_width=True)
                 yaxis_title="Breedte",
                 zaxis_title="Hoogte",
                 aspectmode="data"
