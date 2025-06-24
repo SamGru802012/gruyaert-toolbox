@@ -108,7 +108,7 @@ if st.checkbox("🔍 Toon doorsnede (alleen onderste laag)"):
     zrange = range(z)
 
 fig = go.Figure()
-for zi in zrange:
+                for zi in range(layers):
     for yi in range(k):
         for xi in range(r):
             x0, x1 = xi * l, (xi + 1) * l
