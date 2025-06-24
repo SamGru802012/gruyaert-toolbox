@@ -86,14 +86,53 @@ if None in [col_l, col_b, col_h, col_id]:
 # Berekening
 resultaten = []
 for _, row in df.iterrows():
+ 
     in_l = row[col_l] - marge_l
     in_b = row[col_b] - marge_b
     in_h = row[col_h] - marge_h
 
-    r = min(max_r, in_l // prod_l)
-    k = min(max_k, in_b // prod_b)
-    z = min(max_z, in_h // prod_h)
+    r = in_l // prod_l if max_r > 0 else 0
+    k = in_b // prod_b if max_k > 0 else 0
+    z = in_h // prod_h if max_z > 0 else 0
 
+if r > max_r:
+    r = 0
+if k > max_k:
+    k = 0
+if z > max_z:
+    z = 0
+
+
+
+max_possible_r = in_l // prod_l
+max_possible_k = in_b // prod_b
+max_possible_z = in_h // prod_h
+
+r_values = range(1, max_possible_r+1) if max_r > 0 else [0]
+k_values = range(1, max_possible_k+1) if max_k > 0 else [0]
+z_values = range(1, max_possible_z+1) if max_z > 0 else [0]
+
+best_config = None
+best_count = 0
+
+for r in r_values:
+    if r > max_r: continue
+    for k in k_values:
+        if k > max_k: continue
+        for z in z_values:
+            if z > max_z: continue
+            total = r * k * z
+            if total > best_count:
+                pallet_h = pallet_hoogte + z * prod_h
+                if pallet_h <= pallet_max:
+                    best_count = total
+                    best_config = (r, k, z)
+if not best_config:
+    continue
+
+r, k, z = best_config
+totaal_hoogte = pallet_hoogte + z * prod_h
+eff = round((best_count * prod_l * prod_b * prod_h) / (row[col_l]*row[col_b]*row[col_h]) * 100, 2)
     if r * k * z == 0:
         continue
 
