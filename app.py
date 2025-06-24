@@ -124,26 +124,32 @@ if uploaded:
     outer_b = box_b + 2 * wanddikte
     outer_h = box_h + 2 * wanddikte
 
-    # Visualiseer omdoos
-    fig.add_trace(go.Mesh3d(
-        x=[0, outer_l, outer_l, 0, 0, outer_l, outer_l, 0],
-        y=[0, 0, outer_b, outer_b, 0, 0, outer_b, outer_b],
-        z=[0, 0, 0, 0, outer_h, outer_h, outer_h, outer_h],
-        i=[0,0,0,1,1,2],
-        j=[1,2,3,2,3,3],
-        k=[2,3,1,5,7,6],
-        color='gray',
-        opacity=0.1
+    
+# Teken randen van de omverpakking (buitenafmetingen)
+edges = [
+    [(0, 0, 0), (outer_l, 0, 0)],
+    [(0, 0, 0), (0, outer_b, 0)],
+    [(0, 0, 0), (0, 0, outer_h)],
+    [(outer_l, outer_b, 0), (0, outer_b, 0)],
+    [(outer_l, outer_b, 0), (outer_l, 0, 0)],
+    [(outer_l, outer_b, 0), (outer_l, outer_b, outer_h)],
+    [(0, outer_b, outer_h), (outer_l, outer_b, outer_h)],
+    [(0, outer_b, outer_h), (0, 0, outer_h)],
+    [(0, outer_b, outer_h), (0, outer_b, 0)],
+    [(outer_l, 0, outer_h), (outer_l, outer_b, outer_h)],
+    [(outer_l, 0, outer_h), (0, 0, outer_h)],
+    [(outer_l, 0, outer_h), (outer_l, 0, 0)],
+]
+for e in edges:
+    fig.add_trace(go.Scatter3d(
+        x=[e[0][0], e[1][0]],
+        y=[e[0][1], e[1][1]],
+        z=[e[0][2], e[1][2]],
+        mode='lines',
+        line=dict(color='black', width=4),
+        showlegend=False
     ))
 
-    # Label
-    fig.add_trace(go.Scatter3d(
-        x=[outer_l/2],
-        y=[outer_b/2],
-        z=[outer_h + 10],
-        text=[f"Buitenafm.: {int(outer_l)}x{int(outer_b)}x{int(outer_h)} mm"],
-        mode="text"
-    ))
 
     fig.update_layout(scene=dict(
         xaxis_title="L",
