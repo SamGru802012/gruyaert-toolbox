@@ -105,7 +105,6 @@ with tab1:
 # Optie: toon doorsnede
 if st.checkbox("🔍 Toon doorsnede (alleen onderste laag)"):
     zrange = range(1)
-else:
     zrange = range(z)
 
 fig = go.Figure()
@@ -132,8 +131,6 @@ fig.update_layout(scene=dict(
 )
 st.plotly_chart(fig)
 
-        else:
-            st.warning("⚠ Geen geldige configuraties gevonden.")
 
 with tab2:
     st.subheader("🛑 Uitsluitingen")
@@ -141,7 +138,6 @@ with tab2:
         df_uitsluit = pd.DataFrame(uitsluitingen)
         st.dataframe(df_uitsluit)
         st.download_button("📤 Download uitsluitingen", df_uitsluit.to_csv(index=False).encode("utf-8"), file_name="uitsluitingen.csv", mime="text/csv")
-    else:
         st.info("Geen uitsluitingen vastgesteld.")
 
 with tab3:
