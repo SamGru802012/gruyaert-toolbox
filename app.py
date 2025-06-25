@@ -2,129 +2,137 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import plotly.graph_objects as go
 
-st.title("📦 Verpakking Optimalisatie AI Agent")
+st.set_page_config(layout="wide")
+st.title("📦 Gruyaert Verpakkingsoptimalisatie")
 
-if "reset" not in st.session_state:
-    st.session_state.reset = False
+# Invoer: Product
+st.sidebar.header("🔧 Invoer parameters")
+product_ref = st.sidebar.text_input("Product referentie", "PRD-001")
+prod_l = st.sidebar.number_input("Lengte product (mm)", min_value=1, value=100)
+prod_b = st.sidebar.number_input("Breedte product (mm)", min_value=1, value=80)
+prod_h = st.sidebar.number_input("Hoogte product (mm)", min_value=1, value=60)
 
-def do_reset():
-    st.session_state.reset = True
+# Invoer: Marges
+st.sidebar.markdown("### Marges in omverpakking")
+marge_l = st.sidebar.number_input("Marge lengte (mm)", min_value=0, value=0)
+marge_b = st.sidebar.number_input("Marge breedte (mm)", min_value=0, value=0)
+marge_h = st.sidebar.number_input("Marge hoogte (mm)", min_value=0, value=0)
 
-st.sidebar.header("Stap 1: Upload je stockbestand")
-stock_file = st.sidebar.file_uploader("Upload een Excel- of CSV-bestand met omverpakkingstock", type=["csv", "xlsx"])
+# Invoer: beperkingen
+st.sidebar.markdown("### Verpakkingslimieten")
+lim_r = st.sidebar.slider("Max. rijen", 1, 20, 10)
+lim_k = st.sidebar.slider("Max. kolommen", 1, 20, 10)
+lim_z = st.sidebar.slider("Max. lagen", 1, 20, 10)
 
-st.sidebar.header("Stap 2: Geef afmetingen van productdoos in (mm)")
-prod_l = st.sidebar.number_input("Lengte", min_value=1, key="prod_l")
-prod_b = st.sidebar.number_input("Breedte", min_value=1, key="prod_b")
-prod_h = st.sidebar.number_input("Hoogte", min_value=1, key="prod_h")
+# Invoer: Pallet
+st.sidebar.markdown("### Pallethoogte instellingen")
+pallet_max_h = st.sidebar.number_input("Max. pallethoogte (mm)", min_value=100, value=1200)
+pallet_hoogte = st.sidebar.number_input("Hoogte lege pallet (mm)", min_value=0, value=150)
 
-st.sidebar.header("Stap 3: Interne verliesruimte per richting (mm)")
-extra_l = st.sidebar.number_input("Verlies in lengte (doos L - X)", min_value=0, value=0, key="extra_l")
-extra_b = st.sidebar.number_input("Verlies in breedte (doos B - X)", min_value=0, value=0, key="extra_b")
-extra_h = st.sidebar.number_input("Verlies in hoogte (doos H - X)", min_value=0, value=0, key="extra_h")
+# Upload CSV
+st.sidebar.markdown("### 📥 Upload CSV")
+uploaded_file = st.sidebar.file_uploader("CSV met omverpakkingen", type=["csv"])
 
-st.sidebar.header("Stap 4: Palletinstellingen")
-pallet_l = st.sidebar.number_input("Pallet lengte (mm)", value=1200, key="pallet_l")
-pallet_b = st.sidebar.number_input("Pallet breedte (mm)", value=800, key="pallet_b")
-pallet_h = st.sidebar.number_input("Max. pallet hoogte (mm)", value=1800, key="pallet_h")
-pallet_tol = st.sidebar.number_input("Max. extra tolerantie (mm)", value=100, key="pallet_tol")
+if uploaded_file:
+    try:
+        df = pd.read_csv(uploaded_file)
+    except Exception as e:
+        st.error(f"Fout bij lezen CSV: {e}")
+        st.stop()
 
-st.sidebar.header("Stap 5: Aantallenlimieten")
-min_per_box = st.sidebar.number_input("Min. aantal per omverpakking", value=1, min_value=0, key="min_per_box")
-max_per_box = st.sidebar.number_input("Max. aantal per omverpakking", value=9999, min_value=1, key="max_per_box")
+    # Zoek kolommen automatisch
+    def zoek_kolom(df, naam):
+        for col in df.columns:
+            if naam.lower() in col.lower():
+                return col
+        return None
 
-st.sidebar.header("Stap 6: Filters")
-min_stock = st.sidebar.number_input("Minimale beschikbare stock", value=1, min_value=0, key="min_stock")
-max_leegte = st.sidebar.slider("Max. toegelaten lege ruimte (%)", 0, 100, 40, key="max_leegte")
-top_x = st.sidebar.slider("Toon enkel top resultaten (aantal)", 1, 50, 10, key="top_x")
+    col_l = zoek_kolom(df, "lengte")
+    col_b = zoek_kolom(df, "breedte")
+    col_h = zoek_kolom(df, "hoogte")
+    col_id = zoek_kolom(df, "id") or zoek_kolom(df, "ref") or df.columns[0]
 
-st.sidebar.markdown("---")
-st.sidebar.button("🔄 Reset filters", on_click=do_reset)
+    if None in [col_l, col_b, col_h, col_id]:
+        st.error("CSV moet kolommen hebben voor lengte, breedte, hoogte en ID.")
+        st.stop()
 
-if st.session_state.reset:
-    st.warning("↩ Herstart de app handmatig om alle filters te resetten.")
-    st.stop()
+    resultaten = []
+    for _, row in df.iterrows():
+        in_l = row[col_l] - marge_l
+        in_b = row[col_b] - marge_b
+        in_h = row[col_h] - marge_h
 
-if stock_file and prod_l > 0 and prod_b > 0 and prod_h > 0:
-    if stock_file.name.endswith(".csv"):
-        df = pd.read_csv(stock_file)
+        max_r = int(in_l // prod_l)
+        max_k = int(in_b // prod_b)
+        max_z = int(in_h // prod_h)
+
+        r = min(max_r, lim_r)
+        k = min(max_k, lim_k)
+        z = min(max_z, lim_z)
+
+        if r * k * z == 0:
+            continue
+
+        total = r * k * z
+        eff = round((total * prod_l * prod_b * prod_h) / (row[col_l]*row[col_b]*row[col_h]) * 100, 2)
+        totaal_hoogte = pallet_hoogte + z * prod_h
+        if totaal_hoogte > pallet_max_h:
+            continue
+
+        resultaten.append({
+            "Omverpakking": row[col_id],
+            "Binnenafm. (LxBxH)": f"{row[col_l]}x{row[col_b]}x{row[col_h]}",
+            "Rijen": r,
+            "Kolommen": k,
+            "Lagen": z,
+            "Totaal stuks": total,
+            "Pallethoogte (mm)": totaal_hoogte,
+            "Volume-efficiëntie (%)": eff
+        })
+
+    if resultaten:
+        df_res = pd.DataFrame(resultaten).sort_values("Volume-efficiëntie (%)", ascending=False)
+        st.success(f"✅ {len(df_res)} geldige oplossingen gevonden")
+        st.dataframe(df_res)
+
+        csv = df_res.to_csv(index=False).encode("utf-8")
+        st.download_button("📥 Download resultaten", csv, f"resultaten_{product_ref}.csv")
+
+        keuze = st.selectbox("📦 Kies een omverpakking voor visualisatie", df_res["Omverpakking"])
+        vis_row = df_res[df_res["Omverpakking"] == keuze].iloc[0]
+        r, k, z = int(vis_row["Rijen"]), int(vis_row["Kolommen"]), int(vis_row["Lagen"])
+
+        kleuren = ["#1f77b4", "#2ca02c", "#d62728", "#ff7f0e", "#9467bd", "#8c564b", "#17becf"]
+
+        fig = go.Figure()
+        for zi in range(z):
+            for yi in range(k):
+                for xi in range(r):
+                    kleur = kleuren[(zi + yi + xi) % len(kleuren)]
+                    x0, x1 = xi * prod_l, (xi + 1) * prod_l
+                    y0, y1 = yi * prod_b, (yi + 1) * prod_b
+                    z0, z1 = zi * prod_h, (zi + 1) * prod_h
+                    fig.add_trace(go.Mesh3d(
+                        x=[x0,x1,x1,x0,x0,x1,x1,x0],
+                        y=[y0,y0,y1,y1,y0,y0,y1,y1],
+                        z=[z0,z0,z0,z0,z1,z1,z1,z1],
+                        i=[0,1,2,3,4,5,6,7],
+                        j=[1,2,3,0,5,6,7,4],
+                        k=[2,3,0,1,6,7,4,5],
+                        color=kleur,
+                        opacity=0.5,
+                        showscale=False
+                    ))
+        fig.update_layout(scene=dict(
+            xaxis_title="Lengte",
+            yaxis_title="Breedte",
+            zaxis_title="Hoogte",
+            aspectmode="data"
+        ), margin=dict(l=0, r=0, t=0, b=0))
+        st.plotly_chart(fig, use_container_width=True)
     else:
-        df = pd.read_excel(stock_file)
-
-    required_cols = {"OmverpakkingsID", "Lengte_mm", "Breedte_mm", "Hoogte_mm", "Beschikbare_Stock"}
-    if not required_cols.issubset(df.columns):
-        st.error("Bestand mist vereiste kolommen: " + ", ".join(required_cols))
-    else:
-        orientations = [
-            (prod_l, prod_b, prod_h),
-            (prod_l, prod_h, prod_b),
-            (prod_b, prod_l, prod_h),
-            (prod_b, prod_h, prod_l),
-            (prod_h, prod_l, prod_b),
-            (prod_h, prod_b, prod_l)
-        ]
-
-        resultaten = []
-
-        for idx, row in df.iterrows():
-            if row["Beschikbare_Stock"] < min_stock:
-                continue
-
-            best = {"score": 0}
-            usable_l = row["Lengte_mm"] - extra_l
-            usable_b = row["Breedte_mm"] - extra_b
-            usable_h = row["Hoogte_mm"] - extra_h
-
-            if usable_l <= 0 or usable_b <= 0 or usable_h <= 0:
-                continue
-
-            for o in orientations:
-                l, b, h = o
-                per_laag = int(usable_l // l) * int(usable_b // b)
-                lagen = int(usable_h // h)
-                totaal = per_laag * lagen
-
-                if totaal < min_per_box or totaal > max_per_box or totaal == 0:
-                    continue
-
-                vol_product = totaal * l * b * h
-                vol_omv = row["Lengte_mm"] * row["Breedte_mm"] * row["Hoogte_mm"]
-                leegte = 1 - (vol_product / vol_omv) if vol_omv > 0 else 1
-                if leegte * 100 > max_leegte:
-                    continue
-
-                pallet_per_laag = int(pallet_l // row["Lengte_mm"]) * int(pallet_b // row["Breedte_mm"])
-                pallet_lagen = int((pallet_h + pallet_tol) // row["Hoogte_mm"])
-                totaal_pallet = pallet_per_laag * pallet_lagen * totaal
-
-                score = totaal * (1 - leegte)
-                if score > best["score"]:
-                    best = {
-                        "OmverpakkingsID": row["OmverpakkingsID"],
-                        "Afmetingen": f"{row['Lengte_mm']}x{row['Breedte_mm']}x{row['Hoogte_mm']}",
-                        "Gebruik": f"{usable_l}x{usable_b}x{usable_h}",
-                        "Oriëntatie": f"{l}x{b}x{h}",
-                        "Aantal per Omverpakking": totaal,
-                        "Totale Producten per Pallet": totaal_pallet,
-                        "Lege Ruimte (%)": f"{leegte*100:.1f}%",
-                        "Beschikbare Stock": row["Beschikbare_Stock"],
-                        "Score": round(score, 2)
-                    }
-
-            if best["score"] > 0:
-                resultaten.append(best)
-
-        if resultaten:
-            df_result = pd.DataFrame(resultaten)
-            df_result = df_result.sort_values(by="Score", ascending=False).reset_index(drop=True)
-            df_top = df_result.head(top_x)
-            st.success(f"✅ {len(df_top)} beste verpakkingsopties gevonden.")
-            st.dataframe(df_top)
-
-            csv = df_top.to_csv(index=False).encode("utf-8")
-            st.download_button("📥 Download resultaten als CSV", csv, "verpakkingsopties.csv", "text/csv")
-        else:
-            st.warning("⚠ Geen resultaten voldoen aan de opgegeven filters en marges.")
+        st.warning("⚠ Geen geldige combinaties gevonden.")
 else:
-    st.info("📄 Upload eerst een bestand en geef de doosafmetingen in om te starten.")
+    st.info("⬅️ Upload een CSV-bestand om te starten.")
