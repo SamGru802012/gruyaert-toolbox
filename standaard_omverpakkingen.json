@@ -1,0 +1,37 @@
+[
+  {
+    "ID": 1,
+    "Referentie": "A1",
+    "Binnen_L": 300,
+    "Binnen_B": 200,
+    "Binnen_H": 150
+  },
+  {
+    "ID": 2,
+    "Referentie": "A2",
+    "Binnen_L": 320,
+    "Binnen_B": 220,
+    "Binnen_H": 170
+  },
+  {
+    "ID": 3,
+    "Referentie": "A3",
+    "Binnen_L": 350,
+    "Binnen_B": 240,
+    "Binnen_H": 190
+  },
+  {
+    "ID": 4,
+    "Referentie": "A4",
+    "Binnen_L": 370,
+    "Binnen_B": 260,
+    "Binnen_H": 210
+  },
+  {
+    "ID": 5,
+    "Referentie": "A5",
+    "Binnen_L": 390,
+    "Binnen_B": 280,
+    "Binnen_H": 230
+  }
+]
