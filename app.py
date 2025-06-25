@@ -62,13 +62,9 @@ if uploaded_file:
             if in_l <= 0 or in_b <= 0 or in_h <= 0:
                 continue
 
-            max_r = int(in_l // prod_l)
-max_k = int(in_b // prod_b)
-max_z = int(in_h // prod_h)
-
-r = min(max_r, max_rijen)
-k = min(max_k, max_kolommen)
-z = min(max_z, max_lagen)
+            r = min(int(in_l // prod_l), max_rijen)
+            k = min(int(in_b // prod_b), max_kolommen)
+            z = min(int(in_h // prod_h), max_lagen)
 
             if r * k * z == 0:
                 continue
