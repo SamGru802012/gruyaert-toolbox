@@ -53,11 +53,38 @@ if uploaded_file:
             in_l = row[col_l] - marge_l
             in_b = row[col_b] - marge_b
             in_h = row[col_h] - marge_h
-
             if in_l <= 0 or in_b <= 0 or in_h <= 0:
-                continue
+    # 🔄 Test alle 6 mogelijke rotaties van het product in de omverpakking
+            beste_eff = 0
+            beste_combinatie = None
 
-            r = int(in_l // prod_l)
+            for rot in set(permutations([product_l, product_b, product_h])):
+                pl, pb, ph = rot
+
+                # Bereken hoe vaak het product past in elke richting, rekening houdend met marges
+                r = int(in_l // pl) if pl > 0 else 0
+                k = int(in_b // pb) if pb > 0 else 0
+                z = int(in_h // ph) if ph > 0 else 0
+
+                if r == 0 or k == 0 or z == 0:
+                    continue  # Deze rotatie past niet
+
+                totaal = r * k * z
+                volume_producten = totaal * (pl * pb * ph)
+                volume_omdoos = in_l * in_b * in_h
+                eff = (volume_producten / volume_omdoos) * 100 if volume_omdoos > 0 else 0
+
+                # Sla enkel de beste rotatie per omdoos op
+                if totaal > 0 and eff > beste_eff:
+                    beste_eff = eff
+                    beste_combinatie = {
+                        "Rijen": r,
+                        "Kolommen": k,
+                        "Lagen": z,
+                        "Aantal": totaal,
+                        "Efficiëntie": round(eff, 2),
+                        "Productorientatie": f"{pl}×{pb}×{ph} mm"
+                    }
             k = int(in_b // prod_b)
             z = int(in_h // prod_h)
 
