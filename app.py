@@ -54,6 +54,7 @@ if uploaded_file:
             in_b = row[col_b] - marge_b
             in_h = row[col_h] - marge_h
             if in_l <= 0 or in_b <= 0 or in_h <= 0:
+                continue  # ❗ Skip ongeldige binnenafmetingen
     # 🔄 Test alle 6 mogelijke rotaties van het product in de omverpakking
             beste_eff = 0
             beste_combinatie = None
