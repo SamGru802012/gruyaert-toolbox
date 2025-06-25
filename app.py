@@ -19,11 +19,6 @@ marge_l = st.sidebar.number_input("Marge links/rechts (mm)", min_value=0, value=
 marge_b = st.sidebar.number_input("Marge voor/achter (mm)", min_value=0, value=0)
 marge_h = st.sidebar.number_input("Marge boven/onder (mm)", min_value=0, value=0)
 
-st.sidebar.markdown("### Maximumverdeling per omverpakking")
-max_rijen = st.sidebar.slider("Max. rijen (L)", 1, 10, 10)
-max_kolommen = st.sidebar.slider("Max. kolommen (B)", 1, 10, 10)
-max_lagen = st.sidebar.slider("Max. lagen (H)", 1, 10, 10)
-
 st.sidebar.markdown("### Pallethoogte instellingen")
 pallet_hoogte = st.sidebar.number_input("Max. totale pallethoogte (mm)", min_value=100, value=1200)
 pallet_hoogte_zonder_lading = st.sidebar.number_input("Hoogte lege pallet (mm)", min_value=0, value=150)
@@ -62,9 +57,9 @@ if uploaded_file:
             if in_l <= 0 or in_b <= 0 or in_h <= 0:
                 continue
 
-            r = min(int(in_l // prod_l), max_rijen)
-            k = min(int(in_b // prod_b), max_kolommen)
-            z = min(int(in_h // prod_h), max_lagen)
+            r = int(in_l // prod_l)
+            k = int(in_b // prod_b)
+            z = int(in_h // prod_h)
 
             if r * k * z == 0:
                 continue
