@@ -1,6 +1,11 @@
-# Gruyaert Toolbox
 
-Streamlit-app voor interne verpakkingsoptimalisatie.
-Upload CSV-bestanden en bepaal de meest efficiënte omverpakking + visualisatie.
+# Gruyaert Verpakkingstool
 
-Gebruik: https://streamlit.io/cloud
+Een intelligente tool om producten te verpakken in omdozen en te stapelen op pallets met optimale efficiëntie.
+
+## Installatie
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```

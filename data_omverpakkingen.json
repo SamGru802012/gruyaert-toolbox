@@ -1,0 +1,26 @@
+[
+  {
+    "ID": 1,
+    "referentie": "D001",
+    "binnen_lengte": 400,
+    "binnen_breedte": 300,
+    "binnen_hoogte": 200,
+    "dikte": 3
+  },
+  {
+    "ID": 2,
+    "referentie": "D002",
+    "binnen_lengte": 500,
+    "binnen_breedte": 350,
+    "binnen_hoogte": 250,
+    "dikte": 3
+  },
+  {
+    "ID": 3,
+    "referentie": "D003",
+    "binnen_lengte": 300,
+    "binnen_breedte": 250,
+    "binnen_hoogte": 150,
+    "dikte": 3
+  }
+]
