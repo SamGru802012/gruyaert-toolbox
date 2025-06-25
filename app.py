@@ -1,87 +1,127 @@
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
-import json
-from itertools import permutations
 
-# -------------------- CONFIG --------------------
 st.set_page_config(layout="wide")
-st.title("📦 Gruyaert Verpakking Optimalisatie")
+st.title("📦 Gruyaert Verpakkingsoptimalisatie Tool")
 
-# -------------------- INVOER --------------------
-st.sidebar.header("Productafmetingen (mm)")
-l = st.sidebar.number_input("Lengte", 1, 2000, 100)
-b = st.sidebar.number_input("Breedte", 1, 2000, 80)
-h = st.sidebar.number_input("Hoogte", 1, 2000, 60)
+st.sidebar.header("🔧 Invoerparameters")
 
-st.sidebar.header("Marges in omdoos (mm)")
-m_l = st.sidebar.number_input("Marge lengte", 0, 100, 0)
-m_b = st.sidebar.number_input("Marge breedte", 0, 100, 0)
-m_h = st.sidebar.number_input("Marge hoogte", 0, 100, 0)
+product_ref = st.sidebar.text_input("Referentie product", value="PRD-001")
+prod_l = st.sidebar.number_input("Lengte (mm)", min_value=1, value=100)
+prod_b = st.sidebar.number_input("Breedte (mm)", min_value=1, value=80)
+prod_h = st.sidebar.number_input("Hoogte (mm)", min_value=1, value=60)
 
-# -------------------- LADEN VAN DATA --------------------
-# Data ingeladen vanuit json (latente opslag), voorbeelddata:
-try:
-    with open("standaard_omverpakkingen.json", "r") as f:
-        doos_data = json.load(f)
-except FileNotFoundError:
-    doos_data = [
-        {"ID": 1, "Referentie": "A1", "Binnen_L": 300, "Binnen_B": 200, "Binnen_H": 150},
-        {"ID": 2, "Referentie": "A2", "Binnen_L": 320, "Binnen_B": 220, "Binnen_H": 170},
-        {"ID": 3, "Referentie": "A3", "Binnen_L": 350, "Binnen_B": 240, "Binnen_H": 190},
-        {"ID": 4, "Referentie": "A4", "Binnen_L": 370, "Binnen_B": 260, "Binnen_H": 210},
-        {"ID": 5, "Referentie": "A5", "Binnen_L": 390, "Binnen_B": 280, "Binnen_H": 230},
-    ]
+st.sidebar.markdown("### Marges in omverpakking (ruimte die moet blijven)")
+marge_l = st.sidebar.number_input("Marge links/rechts (mm)", min_value=0, value=0)
+marge_b = st.sidebar.number_input("Marge voor/achter (mm)", min_value=0, value=0)
+marge_h = st.sidebar.number_input("Marge boven/onder (mm)", min_value=0, value=0)
 
-data = pd.DataFrame(doos_data)
+st.sidebar.markdown("### Pallethoogte instellingen")
+pallet_hoogte = st.sidebar.number_input("Max. totale pallethoogte (mm)", min_value=100, value=1200)
+pallet_hoogte_zonder_lading = st.sidebar.number_input("Hoogte lege pallet (mm)", min_value=0, value=150)
 
-# -------------------- OPTIMALISATIE MET ROTATIE --------------------
-afmetingen = (l, b, h)
-rotaties = sorted(set(permutations(afmetingen)))
+st.sidebar.markdown("### 📥 Upload omverpakking CSV")
+uploaded_file = st.sidebar.file_uploader("Omverpakking CSV", type=["csv"])
 
-resultaten = []
+if uploaded_file:
+    try:
+        df = pd.read_csv(uploaded_file)
+    except Exception as e:
+        st.error(f"Kan bestand niet inladen: {e}")
+        st.stop()
 
-for _, rij in data.iterrows():
-    binnen_l = rij["Binnen_L"] - m_l
-    binnen_b = rij["Binnen_B"] - m_b
-    binnen_h = rij["Binnen_H"] - m_h
+    def find_col(name):
+        for col in df.columns:
+            if name.lower() in col.lower():
+                return col
+        return None
 
-    beste_aantal = 0
-    beste_rotatie = None
-    beste_indeling = None
+    col_l = find_col("lengte") or find_col("length")
+    col_b = find_col("breedte") or find_col("width")
+    col_h = find_col("hoogte") or find_col("height")
+    col_id = find_col("id") or find_col("ref") or df.columns[0]
 
-    # Voor elke mogelijke oriëntatie van het product
-    for rot in rotaties:
-        rijen = int(binnen_l // rot[0])
-        kolommen = int(binnen_b // rot[1])
-        lagen = int(binnen_h // rot[2])
-        totaal = rijen * kolommen * lagen
+    if None in [col_l, col_b, col_h, col_id]:
+        st.error("❌ CSV moet kolommen bevatten voor lengte, breedte, hoogte, ID.")
+    else:
+        results = []
 
-        if totaal > beste_aantal:
-            beste_aantal = totaal
-            beste_rotatie = rot
-            beste_indeling = (rijen, kolommen, lagen)
+        for idx, row in df.iterrows():
+            in_l = row[col_l] - marge_l
+            in_b = row[col_b] - marge_b
+            in_h = row[col_h] - marge_h
 
-    if beste_aantal > 0:
-        resultaten.append({
-            "ID": rij["ID"],
-            "Referentie": rij.get("Referentie", ""),
-            "Rotatie": f"{beste_rotatie}",
-            "Indeling": f"{beste_indeling}",
-            "Aantal producten": beste_aantal
-        })
+            if in_l <= 0 or in_b <= 0 or in_h <= 0:
+                continue
 
-# -------------------- OUTPUT --------------------
-if resultaten:
-    st.subheader("✅ Geoptimaliseerde verpakkingsresultaten")
-    st.dataframe(pd.DataFrame(resultaten))
+            r = int(in_l // prod_l)
+            k = int(in_b // prod_b)
+            z = int(in_h // prod_h)
+
+            if r * k * z == 0:
+                continue
+
+            totaal = r * k * z
+            eff = round((totaal * prod_l * prod_b * prod_h) / (row[col_l]*row[col_b]*row[col_h]) * 100, 2)
+            totale_hoogte = pallet_hoogte_zonder_lading + z * prod_h
+            if totale_hoogte > pallet_hoogte:
+                continue
+
+            results.append({
+                "OmverpakkingID": row[col_id],
+                "Binnenafm. (LxBxH)": f"{row[col_l]}x{row[col_b]}x{row[col_h]}",
+                "Rijen": r,
+                "Kolommen": k,
+                "Lagen": z,
+                "Totaal stuks": totaal,
+                "Pallethoogte (mm)": totale_hoogte,
+                "Volume-efficiëntie (%)": eff
+            })
+
+        if results:
+            df_result = pd.DataFrame(results).sort_values("Volume-efficiëntie (%)", ascending=False)
+            st.subheader(f"📊 Resultaten voor product **{product_ref}**")
+            st.dataframe(df_result, use_container_width=True)
+
+            csv = df_result.to_csv(index=False).encode("utf-8")
+            st.download_button("📥 Download resultaten als CSV", csv, f"resultaten_{product_ref}.csv", mime="text/csv")
+
+            selected = st.selectbox("📦 Kies omverpakking voor visualisatie", df_result["OmverpakkingID"])
+            sel = df_result[df_result["OmverpakkingID"] == selected].iloc[0]
+
+            r, k, z = int(sel["Rijen"]), int(sel["Kolommen"]), int(sel["Lagen"])
+            kleuren = ["#1f77b4", "#2ca02c", "#d62728", "#9467bd", "#ff7f0e", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
+
+            fig = go.Figure()
+            for zi in range(z):
+                for yi in range(k):
+                    for xi in range(r):
+                        x0, x1 = xi * prod_l, (xi + 1) * prod_l
+                        y0, y1 = yi * prod_b, (yi + 1) * prod_b
+                        z0, z1 = zi * prod_h, (zi + 1) * prod_h
+                        kleur = kleuren[(zi + yi + xi) % len(kleuren)]
+                        fig.add_trace(go.Mesh3d(
+                            x=[x0,x1,x1,x0,x0,x1,x1,x0],
+                            y=[y0,y0,y1,y1,y0,y0,y1,y1],
+                            z=[z0,z0,z0,z0,z1,z1,z1,z1],
+                            i=[0, 0, 0, 1, 1, 2],
+                            j=[1, 2, 3, 2, 3, 3],
+                            k=[2, 3, 1, 5, 7, 6],
+                            opacity=0.5,
+                            color=kleur,
+                            showscale=False
+                        ))
+            fig.update_layout(scene=dict(
+                xaxis_title="Lengte",
+                yaxis_title="Breedte",
+                zaxis_title="Hoogte",
+                aspectmode="data"
+            ), margin=dict(l=0, r=0, t=0, b=0))
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.warning("⚠ Geen geldige configuraties gevonden.")
 else:
-    st.warning("❗Geen resultaten. Pas marges of productgrootte aan.")
-
-# -------------------- TOEKOMSTIGE UITBREIDING --------------------
-# - Visualisatie met kleuren per laag/kolom/rij
-# - Opslaan favorieten
-# - Palletisatie op basis van rotatie
-# - CSV/JSON export
-# - Latente opslag bewerkingen
+    st.info("⬅️ Upload een CSV-bestand om te starten.")
