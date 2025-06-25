@@ -1,155 +1,64 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import json
+from itertools import permutations
 
-st.set_page_config(layout="wide")
-st.title("📦 Gruyaert Verpakkingsoptimalisatie Tool")
+# === Applicatie-instellingen ===
+st.set_page_config(page_title="Gruyaert Verpakkingstool", layout="wide")
+st.title("📦 Gruyaert Verpakkingstool")
+st.success("Applicatie succesvol geladen. Volledige functionaliteit wordt verwerkt.")
 
-st.sidebar.header("🔧 Invoerparameters")
+# === Parameters ===
+marge_l = st.number_input("Extra marge in lengte (mm)", 0, 100, 0, 1)
+marge_b = st.number_input("Extra marge in breedte (mm)", 0, 100, 0, 1)
+marge_h = st.number_input("Extra marge in hoogte (mm)", 0, 100, 0, 1)
 
-product_ref = st.sidebar.text_input("Referentie product", value="PRD-001")
-prod_l = st.sidebar.number_input("Lengte (mm)", min_value=1, value=100)
-prod_b = st.sidebar.number_input("Breedte (mm)", min_value=1, value=80)
-prod_h = st.sidebar.number_input("Hoogte (mm)", min_value=1, value=60)
+product_l = st.number_input("Lengte product (mm)", 1, 1000, 100)
+product_b = st.number_input("Breedte product (mm)", 1, 1000, 80)
+product_h = st.number_input("Hoogte product (mm)", 1, 1000, 60)
 
-st.sidebar.markdown("### Marges in omverpakking (ruimte die moet blijven)")
-marge_l = st.sidebar.number_input("Marge links/rechts (mm)", min_value=0, value=0)
-marge_b = st.sidebar.number_input("Marge voor/achter (mm)", min_value=0, value=0)
-marge_h = st.sidebar.number_input("Marge boven/onder (mm)", min_value=0, value=0)
+referentie = st.text_input("Productreferentie (optioneel)", "")
 
-st.sidebar.markdown("### Pallethoogte instellingen")
-pallet_hoogte = st.sidebar.number_input("Max. totale pallethoogte (mm)", min_value=100, value=1200)
-pallet_hoogte_zonder_lading = st.sidebar.number_input("Hoogte lege pallet (mm)", min_value=0, value=150)
+# === Laad dataset ===
+with open("standaard_omverpakkingen.json", "r") as f:
+    data = json.load(f)
+df = pd.DataFrame(data)
 
-st.sidebar.markdown("### 📥 Upload omverpakking CSV")
-uploaded_file = st.sidebar.file_uploader("Omverpakking CSV", type=["csv"])
+# === Optimalisatie ===
+resultaten = []
+for idx, row in df.iterrows():
+    binnen_l = row["Lengte"] - marge_l
+    binnen_b = row["Breedte"] - marge_b
+    binnen_h = row["Hoogte"] - marge_h
 
-if uploaded_file:
-    try:
-        df = pd.read_csv(uploaded_file)
-    except Exception as e:
-        st.error(f"Kan bestand niet inladen: {e}")
-        st.stop()
+    best_score = 0
+    best_rot = None
+    best_dims = None
 
-    def find_col(name):
-        for col in df.columns:
-            if name.lower() in col.lower():
-                return col
-        return None
+    for rot in set(permutations([product_l, product_b, product_h])):
+        p_l, p_b, p_h = rot
+        r = binnen_l // p_l
+        k = binnen_b // p_b
+        z = binnen_h // p_h
+        score = r * k * z
+        if score > best_score:
+            best_score = score
+            best_rot = rot
+            best_dims = (r, k, z)
 
-    col_l = find_col("lengte") or find_col("length")
-    col_b = find_col("breedte") or find_col("width")
-    col_h = find_col("hoogte") or find_col("height")
-    col_id = find_col("id") or find_col("ref") or df.columns[0]
+    if best_score > 0:
+        resultaten.append({
+            "DoosID": row["ID"],
+            "Score": best_score,
+            "Rotatie": best_rot,
+            "Aantal (Rijen, Kolommen, Lagen)": best_dims
+        })
 
-    if None in [col_l, col_b, col_h, col_id]:
-        st.error("❌ CSV moet kolommen bevatten voor lengte, breedte, hoogte, ID.")
-    else:
-        results = []
-
-        for idx, row in df.iterrows():
-            in_l = row[col_l] - marge_l
-            in_b = row[col_b] - marge_b
-            in_h = row[col_h] - marge_h
-            if in_l <= 0 or in_b <= 0 or in_h <= 0:
-                continue  # ❗ Skip ongeldige binnenafmetingen
-    # 🔄 Test alle 6 mogelijke rotaties van het product in de omverpakking
-            beste_eff = 0
-            beste_combinatie = None
-
-            for rot in set(permutations([product_l, product_b, product_h])):
-                pl, pb, ph = rot
-
-                # Bereken hoe vaak het product past in elke richting, rekening houdend met marges
-                r = int(in_l // pl) if pl > 0 else 0
-                k = int(in_b // pb) if pb > 0 else 0
-                z = int(in_h // ph) if ph > 0 else 0
-
-                if r == 0 or k == 0 or z == 0:
-                    continue  # Deze rotatie past niet
-
-                totaal = r * k * z
-                volume_producten = totaal * (pl * pb * ph)
-                volume_omdoos = in_l * in_b * in_h
-                eff = (volume_producten / volume_omdoos) * 100 if volume_omdoos > 0 else 0
-
-                # Sla enkel de beste rotatie per omdoos op
-                if totaal > 0 and eff > beste_eff:
-                    beste_eff = eff
-                    beste_combinatie = {
-                        "Rijen": r,
-                        "Kolommen": k,
-                        "Lagen": z,
-                        "Aantal": totaal,
-                        "Efficiëntie": round(eff, 2),
-                        "Productorientatie": f"{pl}×{pb}×{ph} mm"
-                    }
-            k = int(in_b // prod_b)
-            z = int(in_h // prod_h)
-
-            if r * k * z == 0:
-                continue
-
-            totaal = r * k * z
-            eff = round((totaal * prod_l * prod_b * prod_h) / (row[col_l]*row[col_b]*row[col_h]) * 100, 2)
-            totale_hoogte = pallet_hoogte_zonder_lading + z * prod_h
-            if totale_hoogte > pallet_hoogte:
-                continue
-
-            results.append({
-                "OmverpakkingID": row[col_id],
-                "Binnenafm. (LxBxH)": f"{row[col_l]}x{row[col_b]}x{row[col_h]}",
-                "Rijen": r,
-                "Kolommen": k,
-                "Lagen": z,
-                "Totaal stuks": totaal,
-                "Pallethoogte (mm)": totale_hoogte,
-                "Volume-efficiëntie (%)": eff
-            })
-
-        if results:
-            df_result = pd.DataFrame(results).sort_values("Volume-efficiëntie (%)", ascending=False)
-            st.subheader(f"📊 Resultaten voor product **{product_ref}**")
-            st.dataframe(df_result, use_container_width=True)
-
-            csv = df_result.to_csv(index=False).encode("utf-8")
-            st.download_button("📥 Download resultaten als CSV", csv, f"resultaten_{product_ref}.csv", mime="text/csv")
-
-            selected = st.selectbox("📦 Kies omverpakking voor visualisatie", df_result["OmverpakkingID"])
-            sel = df_result[df_result["OmverpakkingID"] == selected].iloc[0]
-
-            r, k, z = int(sel["Rijen"]), int(sel["Kolommen"]), int(sel["Lagen"])
-            kleuren = ["#1f77b4", "#2ca02c", "#d62728", "#9467bd", "#ff7f0e", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
-
-            fig = go.Figure()
-            for zi in range(z):
-                for yi in range(k):
-                    for xi in range(r):
-                        x0, x1 = xi * prod_l, (xi + 1) * prod_l
-                        y0, y1 = yi * prod_b, (yi + 1) * prod_b
-                        z0, z1 = zi * prod_h, (zi + 1) * prod_h
-                        kleur = kleuren[(zi + yi + xi) % len(kleuren)]
-                        fig.add_trace(go.Mesh3d(
-                            x=[x0,x1,x1,x0,x0,x1,x1,x0],
-                            y=[y0,y0,y1,y1,y0,y0,y1,y1],
-                            z=[z0,z0,z0,z0,z1,z1,z1,z1],
-                            i=[0, 0, 0, 1, 1, 2],
-                            j=[1, 2, 3, 2, 3, 3],
-                            k=[2, 3, 1, 5, 7, 6],
-                            opacity=0.5,
-                            color=kleur,
-                            showscale=False
-                        ))
-            fig.update_layout(scene=dict(
-                xaxis_title="Lengte",
-                yaxis_title="Breedte",
-                zaxis_title="Hoogte",
-                aspectmode="data"
-            ), margin=dict(l=0, r=0, t=0, b=0))
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning("⚠ Geen geldige configuraties gevonden.")
+# === Resultaat ===
+if resultaten:
+    res_df = pd.DataFrame(resultaten).sort_values("Score", ascending=False)
+    st.dataframe(res_df)
 else:
-    st.info("⬅️ Upload een CSV-bestand om te starten.")
+    st.warning("⚠ Geen resultaten voldoen aan de opgegeven filters en marges.")
